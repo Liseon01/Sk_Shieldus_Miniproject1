@@ -238,7 +238,7 @@ def crawl_yanolja(search_query):
 # --- 메인 코드 실행 ---
 if __name__ == "__main__":
     # 검색어를 여기에 입력하세요.
-    query = "부산 호텔"
+    query = "고양시"
     
     print(f"'{query}'에 대한 검색 결과를 크롤링합니다...")
     
