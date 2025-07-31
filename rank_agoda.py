@@ -84,7 +84,6 @@ def scrape_korean_destinations_headless():
 
     except TimeoutException:
         print("\n❌ 오류: 시간 초과. 웹페이지에서 원하는 정보를 찾지 못했습니다.")
-        driver.save_screenshot('error_screenshot.png')
         print("    'error_screenshot.png' 파일에 현재 화면을 저장했습니다. 확인해보세요.")
     except Exception as e:
         print(f"\n❌ 알 수 없는 오류가 발생했습니다: {e}")
