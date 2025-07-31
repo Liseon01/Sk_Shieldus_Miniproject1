@@ -338,12 +338,17 @@ def crawl_accommodation_data(driver):
 
 def main():
     """메인 실행 함수"""
-    # === 검색하고 싶은 조건으로 변경하세요 ===
-    search_query = "고양"
-    check_in_date = "2025-08-12"
-    check_out_date = "2025-08-14"
-    adults = 2
-    children = 1
+    # === 사용자 입력 받기 ===
+    print("=== 야놀자 숙소 검색 ===")
+    search_query = input("검색어를 입력하세요 (예: 고양, 제주, 부산): ").strip()
+    
+    check_in_date = input("체크인 날짜를 입력하세요 (YYYY-MM-DD 형식, 예: 2025-08-12): ").strip()
+    check_out_date = input("체크아웃 날짜를 입력하세요 (YYYY-MM-DD 형식, 예: 2025-08-14): ").strip()
+    
+    adults_input = input("성인 수를 입력하세요 (기본값: 2): ").strip()
+    adults = int(adults_input) if adults_input.isdigit() else 2
+    
+    children = 0  # 아이 수는 기본값 0으로 설정
     # ==================================
 
     driver = None
@@ -378,4 +383,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
