@@ -189,5 +189,6 @@ if __name__ == "__main__":
         filename = f"trivago_{SEARCH_QUERY}.csv"
         df.to_csv(filename, index=False, encoding='utf-8-sig')
         print(f"\n'{filename}' 파일로 저장이 완료되었습니다.")
+        
     else:
         print("트리바고에서 크롤링된 데이터가 없습니다.")
