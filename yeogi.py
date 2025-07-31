@@ -81,7 +81,7 @@ def crawl_yeogi_to_csv(destination: str, checkin: str, checkout: str, adults: in
     # CSV 파일로 저장
     with open(filename, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["이름", "유형", "위치", "평점", "가격"])
+        writer.writerow(["숙소명", "숙소유형", "위치", "평점", "가격"])
         writer.writerows(results)
 
     print(f"[완료] CSV 저장: {filename}")
