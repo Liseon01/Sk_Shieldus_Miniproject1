@@ -345,8 +345,60 @@ def crawl_accommodation_data(driver):
         print(f"데이터 추출 중 오류 발생: {e}")
         return []
 
+def crawl_yanolja(search_query, check_in_date, check_out_date, adults=2, children=0, save_csv=True):
+    """
+    야놀자 숙소 정보를 크롤링하는 함수
+    
+    Args:
+        search_query (str): 검색어 (예: "고양", "제주", "부산")
+        check_in_date (str): 체크인 날짜 (YYYY-MM-DD 형식)
+        check_out_date (str): 체크아웃 날짜 (YYYY-MM-DD 형식)
+        adults (int): 성인 수 (기본값: 2)
+        children (int): 아이 수 (기본값: 0)
+        save_csv (bool): CSV 파일 저장 여부 (기본값: True)
+    
+    Returns:
+        pandas.DataFrame: 크롤링된 숙소 정보 데이터프레임
+    """
+    driver = None
+    try:
+        driver = setup_driver()
+        wait = WebDriverWait(driver, 15)
+        start_url = "https://nol.yanolja.com/search?tab=place"
+        
+        driver.get(start_url)
+        print(f"시작 URL 접속: {start_url}")
+        
+        if execute_search_flow(driver, wait, search_query, check_in_date, check_out_date, adults, children):
+            scraped_data = crawl_accommodation_data(driver)
+            if scraped_data:
+                # pandas DataFrame으로 변환
+                df = pd.DataFrame(scraped_data)
+                print(f"\n[최종 결과] 총 {len(df)}개의 숙소 정보 수집 완료")
+                
+                # CSV 파일로 저장 (옵션)
+                if save_csv:
+                    filename = f"yanolja_{search_query}.csv"
+                    df.to_csv(filename, index=False, encoding='utf-8-sig')
+                    print(f"\n'{filename}' 파일로 저장되었습니다.")
+                
+                return df
+            else:
+                print("\n수집된 데이터가 없습니다.")
+                return pd.DataFrame()
+        else:
+            print("검색 실행에 실패했습니다.")
+            return pd.DataFrame()
+    except Exception as e:
+        print(f"전체 과정에서 오류 발생: {e}")
+        return pd.DataFrame()
+    finally:
+        if driver:
+            driver.quit()
+        print("\n크롤링 완료. 브라우저가 닫혔습니다.")
+
 def main():
-    """메인 실행 함수"""
+    """메인 실행 함수 (기존 사용자 입력 방식)"""
     # === 사용자 입력 받기 ===
     print("=== 야놀자 숙소 검색 ===")
     search_query = input("검색어를 입력하세요 (예: 고양, 제주, 부산): ").strip()
@@ -360,35 +412,9 @@ def main():
     children = 0  # 아이 수는 기본값 0으로 설정
     # ==================================
 
-    driver = None
-    try:
-        driver = setup_driver()
-        wait = WebDriverWait(driver, 15)
-        start_url = "https://nol.yanolja.com/search?tab=place"
-        
-        driver.get(start_url)
-        print(f"시작 URL 접속: {start_url}")
-        
-        if execute_search_flow(driver, wait, search_query, check_in_date, check_out_date, adults, children):
-            scraped_data = crawl_accommodation_data(driver)
-            if scraped_data:
-                # pandas DataFrame으로 변환하여 표 형태로 출력
-                df = pd.DataFrame(scraped_data)
-                print(f"\n[최종 결과] 총 {len(df)}개의 숙소 정보 수집 완료")
-                print(df)
-                
-                # CSV 파일로 저장
-                filename = f"yanolja_{search_query}.csv"
-                df.to_csv(filename, index=False, encoding='utf-8-sig')
-                print(f"\n'{filename}' 파일로 저장되었습니다.")
-            else:
-                print("\n수집된 데이터가 없습니다.")
-    except Exception as e:
-        print(f"전체 과정에서 오류 발생: {e}")
-    finally:
-        if driver:
-            driver.quit()
-        print("\n스크립트 실행 완료. 브라우저가 닫혔습니다.")
+    # 함수 호출
+    result_df = crawl_yanolja(search_query, check_in_date, check_out_date, adults, children)
+    print(result_df)
 
 if __name__ == "__main__":
     main()
