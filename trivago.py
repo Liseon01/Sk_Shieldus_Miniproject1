@@ -8,11 +8,11 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import random
 import re
-from datetime import datetime # 날짜 계산을 위해 import
+from datetime import datetime
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 def configure_driver():
     """웹 드라이버를 설정하는 함수"""
@@ -41,12 +41,13 @@ def configure_driver():
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     return driver
 
-def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults, max_results=10):
+def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults):
     """
-    트리바고에서 목적지, 날짜, 인원수를 지정하여 호텔 정보를 크롤링하는 최종 함수
+    트리바고에서 모든 페이지의 호텔 정보를 크롤링하는 최종 함수
     """
     driver = configure_driver()
-    wait = WebDriverWait(driver, 20)
+    wait = WebDriverWait(driver, 15)
+    scraped_results = []
     
     try:
         # --- 1. 검색 옵션 설정 ---
@@ -60,7 +61,6 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults,
         time.sleep(1)
         destination_input.send_keys(Keys.TAB)
         
-        # --- 날짜 선택 ---
         print(f"날짜 선택: 체크인({check_in_date}), 체크아웃({check_out_date})")
         
         try:
@@ -70,101 +70,102 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults,
 
             if month_diff > 0:
                 print(f"'{target_dt.year}년 {target_dt.month}월'로 이동하기 위해 '다음 달' 버튼을 {month_diff}번 클릭합니다.")
-                next_month_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="calendar-button-next"]')))
-                for _ in range(month_diff):
+                # ✅ [수정] for 루프 안에서 매번 '다음 달' 버튼을 새로 찾도록 변경
+                for i in range(month_diff):
+                    next_month_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="calendar-button-next"]')))
                     next_month_button.click()
+                    print(f"  ({i+1}/{month_diff}) '다음 달' 클릭")
                     time.sleep(0.3)
         except Exception as e:
             print(f"달력 이동 중 오류 발생: {e}")
 
-        checkin_date_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_in_date}"]')))
-        checkin_date_button.click()
+        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_in_date}"]'))).click()
         time.sleep(0.5)
+        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_out_date}"]'))).click()
         
-        checkout_date_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_out_date}"]')))
-        checkout_date_button.click()
-        
-        # --- 인원수 선택 ---
         print(f"인원수 선택: 성인 {num_adults}명")
         adults_input = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[data-testid="adults-amount"]')))
         current_adults = int(adults_input.get_attribute('value'))
         
-        if current_adults < num_adults:
-            plus_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="adults-amount-plus-button"]')))
-            for _ in range(num_adults - current_adults):
-                plus_button.click()
-                time.sleep(0.2)
-        elif current_adults > num_adults:
-            minus_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="adults-amount-minus-button"]')))
-            for _ in range(current_adults - num_adults):
-                minus_button.click()
+        if current_adults != num_adults:
+            button_id = "adults-amount-plus-button" if current_adults < num_adults else "adults-amount-minus-button"
+            button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="{button_id}"]')))
+            for _ in range(abs(num_adults - current_adults)):
+                button.click()
                 time.sleep(0.2)
         
-        apply_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="guest-selector-apply"]')))
-        apply_button.click()
-
-        # --- 최종 검색 실행 ---
+        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="guest-selector-apply"]'))).click()
         print("설정한 조건으로 검색 실행...")
-        final_search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="search-button-with-loader"]')))
-        final_search_button.click()
+        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="search-button-with-loader"]'))).click()
 
-        # --- 2. 검색 결과 페이지에서 정보 추출 ---
-        print("검색 결과 페이지 로딩 대기 중...")
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'article[data-testid="item"]')))
-        time.sleep(5) 
+        # --- 2. 모든 검색 결과 페이지 순회하며 정보 추출 ---
+        page_number = 1
+        while True:
+            print(f"\n--- {page_number} 페이지 스크레이핑 시작 ---")
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'article[data-testid="item"]')))
+            time.sleep(2)
 
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        hotel_cards = soup.select('article[data-testid="item"]')
-        
-        scraped_results = []
-        print(f"총 {len(hotel_cards)}개의 숙소를 찾았습니다. 상위 {max_results}개 정보를 추출합니다.")
-        for i, card in enumerate(hotel_cards[:max_results]):
+            first_hotel_on_page = driver.find_element(By.CSS_SELECTOR, 'article[data-testid="item"]')
+            
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            hotel_cards = soup.select('article[data-testid="item"]')
+            
+            if not hotel_cards:
+                print("현재 페이지에서 숙소 정보를 찾을 수 없습니다.")
+                break
+
+            print(f"{len(hotel_cards)}개의 숙소 정보를 추출합니다.")
+            for card in hotel_cards:
+                try:
+                    name = card.select_one('span[itemprop="name"]').text.strip()
+                    location = card.select_one('button[data-testid="distance-label-section"] span').text.strip()
+                    rating = card.select_one('span[itemprop="ratingValue"]').text.strip()
+                    type_element = card.select_one('button[data-testid="accommodation-type"]')
+                    accommodation_type = type_element.text.strip() if type_element else "유형 정보 없음"
+                    price_element = card.select_one('div[data-testid="recommended-price"]')
+                    price = "가격 정보 없음"
+                    if price_element:
+                        price_match = re.search(r'[\d,]+', price_element.text.strip())
+                        if price_match:
+                            price = price_match.group(0) + "원"
+                    scraped_results.append({
+                        '숙소명': name, '숙소유형': accommodation_type, '위치': location,
+                        '평점': rating, '가격': price,
+                    })
+                except AttributeError:
+                    continue
+            
+            # --- 다음 페이지로 이동 ('다음' 화살표 버튼 클릭) ---
             try:
-                name = card.select_one('span[itemprop="name"]').text.strip()
-                location = card.select_one('button[data-testid="distance-label-section"] span').text.strip()
-                rating = card.select_one('span[itemprop="ratingValue"]').text.strip()
+                next_page_button = driver.find_element(By.CSS_SELECTOR, 'button[data-testid="next-result-page"]')
                 
-                # ✅ [추가] 숙소 유형 정보 추출
-                type_element = card.select_one('button[data-testid="accommodation-type"]')
-                accommodation_type = type_element.text.strip() if type_element else "유형 정보 없음"
+                if next_page_button.get_attribute('disabled'):
+                    print("마지막 페이지입니다. 스크레이핑을 종료합니다.")
+                    break
+                    
+                driver.execute_script("arguments[0].click();", next_page_button)
+                page_number += 1
+                print(f"다음 페이지({page_number} 페이지)로 이동합니다.")
+                
+                wait.until(EC.staleness_of(first_hotel_on_page))
 
-                price_element = card.select_one('div[data-testid="recommended-price"]')
-                price = "가격 정보 없음"
-                if price_element:
-                    price_text = price_element.text.strip()
-                    price_match = re.search(r'[\d,]+', price_text)
-                    if price_match:
-                        price = price_match.group(0) + "원"
-
-                scraped_results.append({
-                    '숙소명': name,
-                    '숙소유형': accommodation_type, # ✅ [추가] 결과에 포함
-                    '위치': location,
-                    '평점': rating,
-                    '가격': price,
-                })
-            except AttributeError:
-                print(f"  - {i+1}번째 카드에서 일부 정보를 찾을 수 없어 건너뜁니다.")
-                continue
-        
-        return scraped_results
-
+            except NoSuchElementException:
+                print("마지막 페이지입니다. 스크레이핑을 종료합니다.")
+                break
+    
     except Exception as e:
         print(f"크롤링 중 전반적인 오류 발생: {e}")
-        return []
     finally:
         print("\n크롤링 종료. 브라우저를 닫습니다.")
         driver.quit()
+        return scraped_results
 
 # --- 메인 코드 실행 ---
 if __name__ == "__main__":
-    # --- 검색 조건 설정 ---
     SEARCH_QUERY = "서울"
-    # 오늘(2025-07-31) 이후의 날짜로 설정
-    CHECK_IN = "2025-09-20"
-    CHECK_OUT = "2025-09-23"
-    ADULTS = 4
-    MAX_ITEMS = 30
+    CHECK_IN = "2025-11-20"
+    CHECK_OUT = "2025-11-23"
+    ADULTS = 2
 
     print(f"'{SEARCH_QUERY}' 지역, {CHECK_IN} ~ {CHECK_OUT}, 성인 {ADULTS}명 조건으로 크롤링 시작...")
     
@@ -172,23 +173,19 @@ if __name__ == "__main__":
         search_query=SEARCH_QUERY,
         check_in_date=CHECK_IN,
         check_out_date=CHECK_OUT,
-        num_adults=ADULTS,
-        max_results=MAX_ITEMS
+        num_adults=ADULTS
     )
 
     if scraped_data:
-        # ✅ [수정] 원하는 순서대로 열(column)을 정렬
         df = pd.DataFrame(scraped_data)
         df = df[['숙소명', '숙소유형', '위치', '평점', '가격']]
-
         print(f"\n총 {len(df)}개의 숙소 정보를 찾았습니다.")
         print("\n" + "="*80)
         print(df)
         print("="*80)
         
-        filename = f"trivago_{SEARCH_QUERY}.csv"
+        filename = f"trivago_{SEARCH_QUERY}_all_pages.csv"
         df.to_csv(filename, index=False, encoding='utf-8-sig')
         print(f"\n'{filename}' 파일로 저장이 완료되었습니다.")
-        
     else:
         print("트리바고에서 크롤링된 데이터가 없습니다.")
