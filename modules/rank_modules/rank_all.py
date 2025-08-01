@@ -1,9 +1,7 @@
 # rank_all.py
-
-from rank_trivago import get_trivago_destinations
-from rank_yanolja import get_yanolja_popular_destinations_selenium
-from rank_yeogi import get_yeogi_keywords
-from rank_agoda import scrape_korean_destinations_headless
+from .rank_trivago import get_trivago_destinations
+from .rank_yanolja import get_yanolja_popular_destinations_selenium
+from .rank_yeogi import get_yeogi_keywords
 
 import pandas as pd
 
@@ -34,13 +32,6 @@ def crawl_all_sources():
     except Exception as e:
         print(f"❌ Yeogi 오류: {e}")
         results["Yeogi"] = []
-
-    try:
-        print("🚀 Agoda 크롤링 중...")
-        results["Agoda"] = scrape_korean_destinations_headless()
-    except Exception as e:
-        print(f"❌ Agoda 오류: {e}")
-        results["Agoda"] = []
 
     return results
 
