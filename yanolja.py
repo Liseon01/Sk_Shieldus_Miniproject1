@@ -30,16 +30,13 @@ SELECTORS = {
     "child_age_option": "//button[contains(@class, 'BottomSheetContentsSelect_cellInteractor') and text()='만 7세']",
     "guest_apply_button": "//button[span[contains(., '적용하기')]]",
 
-    # --- (업데이트) 최종 결과 페이지 선택자 - 실제 HTML 구조에 맞게 수정 ---
+    # --- 최종 결과 페이지 선택자 ---
     "list_item_container": "a[href*='place-site.yanolja.com/places/']",  # 숙소 링크
     "item_title": "p.typography-subtitle-16-bold",  # 숙소명
     "item_type": "p.text-text-neutral-sub.typography-body-12-regular",  # 숙소 유형
     "item_location": "span.line-clamp-1.text-start",  # 위치
     "item_rating": "span.typography-body-14-bold",  # 평점
     "item_price": "span.typography-subtitle-18-bold",  # 가격
-    "accommodation_price": "div.flex.flex-1.flex-col.items-end.justify-end.pt-4 span.typography-subtitle-18-bold",  # 숙박 가격
-    "room_info": "div.flex.flex-col.gap-6.rounded-8.bg-fill-neutral-weak.px-8.py-8",  # 객실 정보
-    "room_type": "span.line-clamp-1.text-start.text-text-neutral-sub.typography-body-12-regular",  # 객실 타입
 }
 
 def setup_driver():
@@ -58,7 +55,6 @@ def setup_driver():
     options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     options.add_argument("--disable-web-security")
     options.add_argument("--allow-running-insecure-content")
-    # options.add_experimental_option("detach", True)  # 브라우저 자동 닫기 위해 주석 처리
     
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
@@ -71,7 +67,6 @@ def js_click(driver, element):
 
 def execute_search_flow(driver, wait, search_query, check_in_date, check_out_date, adults, children):
     """사용자가 요청한 순서대로 필터를 적용하고 검색을 실행합니다."""
-    # (이전과 동일하여 주석 처리로 요약)
     try:
         # --- ① 검색어 입력 ---
         print("\n--- 1. 검색어 입력 ---")
@@ -152,7 +147,7 @@ def execute_search_flow(driver, wait, search_query, check_in_date, check_out_dat
         return False
 
 def crawl_accommodation_data(driver):
-    """(핵심 수정) 페이지를 스크롤하며 객실별 상세 정보를 추출합니다."""
+    """(수정됨) 페이지를 스크롤하며 객실별 상세 정보와 링크를 추출합니다."""
     print("\n--- 5. 데이터 추출 시작 ---")
     try:
         # 스크롤 다운
@@ -173,6 +168,9 @@ def crawl_accommodation_data(driver):
         results = []
         for idx, item in enumerate(items):
             try:
+                # --- [기능 추가] 숙소별 링크 추출 ---
+                link = item.get_attribute('href') if item else "링크 없음"
+
                 # 기본 숙소 정보 추출
                 try:
                     name_element = item.find_element(By.CSS_SELECTOR, SELECTORS["item_title"])
@@ -201,7 +199,6 @@ def crawl_accommodation_data(driver):
                         rating_text = rating_elements[0].text.strip()
                         rating_match = re.search(r'(\d+\.\d+)', rating_text)
                         if rating_match:
-                            # 5점 만점을 10점 만점으로 변환
                             rating_5point = float(rating_match.group(1))
                             rating_10point = rating_5point * 2
                             rating = f"{rating_10point:.1f}"
@@ -212,66 +209,47 @@ def crawl_accommodation_data(driver):
                 except NoSuchElementException:
                     rating = "평점 없음"
                 
-                # 객실별 가격 정보 추출 (1박 기준으로 개선)
+                # 객실별 가격 정보 추출
                 room_prices = []
-                
-                # 1. 먼저 기본 가격 정보 추출 (1박 기준)
                 try:
-                    # 메인 가격 정보 찾기 (1박 기준)
                     price_elements = item.find_elements(By.CSS_SELECTOR, SELECTORS["item_price"])
                     base_price = "가격 정보 없음"
                     price_type = "1박 기준"
                     
                     for price_element in price_elements:
                         price_text = price_element.text.strip()
-                        # "원" 제거하고 숫자만 추출
                         price_numbers = re.findall(r'[\d,]+', price_text)
                         if price_numbers:
-                            # 쉼표 제거하고 숫자만 추출
                             clean_price = price_numbers[0].replace(',', '')
                             if clean_price.isdigit():
                                 base_price = clean_price
                                 price_type = "1박 기준"
                                 break
                     
-                    # 2. 객실별 상세 정보 추출
                     try:
-                        # 객실 상세 정보가 있는 섹션 찾기
                         room_detail_sections = item.find_elements(By.CSS_SELECTOR, "div.flex.flex-col.gap-6.rounded-8.bg-fill-neutral-weak.px-8.py-8")
                         
                         for room_section in room_detail_sections:
                             try:
-                                # 객실 설명 텍스트 찾기
                                 room_desc_elements = room_section.find_elements(By.CSS_SELECTOR, "span.line-clamp-1.text-start.text-text-neutral-sub.typography-body-12-regular")
                                 
                                 if room_desc_elements:
                                     room_desc = room_desc_elements[0].text.strip()
                                     
-                                    # 인원수 추출 (객실 설명에서)
-                                    capacity = "2인실"  # 기본값
-                                    if "1인" in room_desc or "싱글" in room_desc:
-                                        capacity = "1인실"
-                                    elif "2인" in room_desc or "더블" in room_desc:
-                                        capacity = "2인실"
-                                    elif "3인" in room_desc or "트리플" in room_desc:
-                                        capacity = "3인실"
-                                    elif "4인" in room_desc or "쿼드" in room_desc:
-                                        capacity = "4인실"
-                                    elif "5인" in room_desc:
-                                        capacity = "5인실"
-                                    elif "6인" in room_desc:
-                                        capacity = "6인실"
+                                    capacity = "2인실"
+                                    if "1인" in room_desc or "싱글" in room_desc: capacity = "1인실"
+                                    elif "2인" in room_desc or "더블" in room_desc: capacity = "2인실"
+                                    elif "3인" in room_desc or "트리플" in room_desc: capacity = "3인실"
+                                    elif "4인" in room_desc or "쿼드" in room_desc: capacity = "4인실"
+                                    elif "5인" in room_desc: capacity = "5인실"
+                                    elif "6인" in room_desc: capacity = "6인실"
                                     
-                                    # 객실 타입 결정
                                     room_type = room_desc[:30] if len(room_desc) > 30 else room_desc
-                                    if not room_type or room_type == "":
-                                        room_type = "기본객실"
+                                    if not room_type or room_type == "": room_type = "기본객실"
                                     
-                                    # 객실별 가격 정보 찾기
-                                    room_price = base_price  # 기본값으로 메인 가격 사용
+                                    room_price = base_price
                                     room_price_type = price_type
                                     
-                                    # 객실 섹션 내에서 가격 정보 찾기
                                     try:
                                         room_price_elements = room_section.find_elements(By.CSS_SELECTOR, "span.typography-subtitle-18-bold")
                                         for price_el in room_price_elements:
@@ -287,41 +265,29 @@ def crawl_accommodation_data(driver):
                                         pass
                                     
                                     room_prices.append({
-                                        '객실타입': room_type,
-                                        '인원수': capacity,
-                                        '가격': room_price,
-                                        '가격유형': room_price_type
+                                        '객실타입': room_type, '인원수': capacity, '가격': room_price, '가격유형': room_price_type
                                     })
-                                    
                             except Exception as e:
                                 print(f"객실 상세 정보 추출 중 오류: {e}")
                                 continue
-                                
+                            
                     except Exception as e:
                         print(f"객실 섹션 찾기 중 오류: {e}")
-                    
-                    # 3. 객실 정보가 없으면 기본 가격 정보만 사용
+                
                     if not room_prices:
-                        # 예약 상태 확인
                         status_elements = item.find_elements(By.XPATH, ".//*[contains(text(), '예약마감') or contains(text(), '판매가') or contains(text(), '매진')]")
                         if status_elements:
                             base_price = "예약마감"
                             price_type = "예약마감"
                         
                         room_prices.append({
-                            '객실타입': '기본객실',
-                            '인원수': '2인실',
-                            '가격': base_price,
-                            '가격유형': price_type
+                            '객실타입': '기본객실', '인원수': '2인실', '가격': base_price, '가격유형': price_type
                         })
                         
                 except Exception as e:
                     print(f"가격 추출 중 오류: {e}")
                     room_prices.append({
-                        '객실타입': '기본객실',
-                        '인원수': '2인실',
-                        '가격': '가격 정보 없음',
-                        '가격유형': '오류'
+                        '객실타입': '기본객실', '인원수': '2인실', '가격': '가격 정보 없음', '가격유형': '오류'
                     })
                 
                 # 각 객실별로 결과 저장
@@ -331,7 +297,8 @@ def crawl_accommodation_data(driver):
                         '숙소유형': category,
                         '위치': location,
                         '평점': rating,
-                        '가격': room_info['가격']
+                        '가격': room_info['가격'],
+                        '링크': link # --- [기능 추가] 결과 딕셔너리에 링크 추가 ---
                     })
                 
                 print(f"[{idx+1}] {name} - {category} - {rating} - {len(room_prices)}개 객실")
@@ -398,7 +365,7 @@ def crawl_yanolja(search_query, check_in_date, check_out_date, adults=2, childre
         print("\n크롤링 완료. 브라우저가 닫혔습니다.")
 
 def main():
-    """메인 실행 함수 (기존 사용자 입력 방식)"""
+    """메인 실행 함수"""
     # === 사용자 입력 받기 ===
     print("=== 야놀자 숙소 검색 ===")
     search_query = input("검색어를 입력하세요 (예: 고양, 제주, 부산): ").strip()
@@ -414,6 +381,7 @@ def main():
 
     # 함수 호출
     result_df = crawl_yanolja(search_query, check_in_date, check_out_date, adults, children)
+    print("\n--- 최종 데이터 ---")
     print(result_df)
 
 if __name__ == "__main__":
