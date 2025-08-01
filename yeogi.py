@@ -19,7 +19,7 @@ def crawl_yeogi_to_csv(destination: str, checkin: str, checkout: str, adults: in
     Returns:
     - 저장된 CSV 파일 이름 (str)
     """
-
+    
     # 검색어 포맷 변경 및 파일명 생성
     keyword = destination.replace(" ", "+")
     filename = destination.replace(" ", "_") + "_yeogi.csv"
@@ -30,7 +30,7 @@ def crawl_yeogi_to_csv(destination: str, checkin: str, checkout: str, adults: in
     # Selenium WebDriver 설정 (헤드리스 모드)
     options = Options()
     options.add_argument("--window-size=1200,800")
-    options.add_argument("--headless=new")  # 브라우저 UI 없이 실행
+    options.add_argument("--headless=new") # 브라우저 UI 없이 실행
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     while True:
@@ -48,10 +48,10 @@ def crawl_yeogi_to_csv(destination: str, checkin: str, checkout: str, adults: in
         location_blocks = soup.select("div.css-19li9i9")
         rating_tags = soup.select("div.css-19f645y span.css-9ml4lz")
         price_tags = soup.select("div.css-yeouz0")
-
+        link_tags = soup.select("a.gc-thumbnail-type-seller-card")
+        
         # 최소 개수만큼 반복
-        n = min(len(name_tags), len(type_tags), len(location_blocks), len(rating_tags), len(price_tags))
-
+        n = min(len(name_tags), len(type_tags), len(location_blocks), len(rating_tags), len(price_tags), len(link_tags))
         if n == 0:
             print(f"[INFO] Page {page}: 숙소 없음, 종료.")
             break
@@ -72,7 +72,10 @@ def crawl_yeogi_to_csv(destination: str, checkin: str, checkout: str, adults: in
             else:
                 price_text = "없음"
 
-            results.append([name, acc_type, location, rating, price_text])
+            relative_url = link_tags[i].get("href", "")
+            full_url = f"https://www.yeogi.com{relative_url}" if relative_url else "없음"
+
+            results.append([name, acc_type, location, rating, price_text, full_url])
 
         page += 1  # 다음 페이지로 이동
 
@@ -81,7 +84,7 @@ def crawl_yeogi_to_csv(destination: str, checkin: str, checkout: str, adults: in
     # CSV 파일로 저장
     with open(filename, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["숙소명", "숙소유형", "위치", "평점", "가격"])
+        writer.writerow(["이름", "유형", "위치", "평점", "가격", "링크"])
         writer.writerows(results)
 
     print(f"[완료] CSV 저장: {filename}")
