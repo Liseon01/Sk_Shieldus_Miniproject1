@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-from yanolja import crawl_yanolja
-from yeogi import crawl_yeogi_to_csv
-from trivago import crawl_trivago_final
+from modules.scraping_modules.yanolja import crawl_yanolja
+from modules.scraping_modules.yeogi import crawl_yeogi_to_csv
+from modules.scraping_modules.trivago import crawl_trivago_final
 import os
 import plotly.express as px
 
