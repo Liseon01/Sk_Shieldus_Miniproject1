@@ -26,7 +26,7 @@ def run_all_crawlers(destination, checkin, checkout, adults):
 
     # 3. 트리바고
     with st.spinner('트리바고 크롤링 중...'):
-        trivago_data = crawl_trivago_final(destination, checkin, checkout, adults)
+        trivago_data = crawl_trivago_final(destination, checkin, checkout, adults )
         df_trivago = pd.DataFrame(trivago_data)
         df_trivago['출처'] = '트리바고'
 
