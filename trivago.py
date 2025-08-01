@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-def configure_driver():
+def configure_driver(headless=True):
     """웹 드라이버를 설정하는 함수"""
     options = webdriver.ChromeOptions()
     options.add_argument("start-maximized")
@@ -33,8 +33,9 @@ def configure_driver():
     ]
     options.add_argument(f"--user-agent={random.choice(user_agents)}")
     
-    options.add_argument("--headless")
-    options.add_argument("--window-size=1920,1080") 
+    if headless:
+        options.add_argument("--headless")
+        options.add_argument("--window-size=1920,1080") 
     
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
@@ -42,11 +43,9 @@ def configure_driver():
     return driver
 
 def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults):
-    """
-    트리바고에서 모든 페이지의 호텔 정보를 크롤링하는 최종 함수
-    """
-    driver = configure_driver()
-    wait = WebDriverWait(driver, 15)
+    # 디버깅 시에는 headless=False로 설정하여 브라우저 창을 직접 확인하세요.
+    driver = configure_driver(headless=True)
+    wait = WebDriverWait(driver, 20) # 대기 시간을 넉넉하게 20초로 설정
     scraped_results = []
     
     try:
@@ -69,19 +68,20 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults)
             month_diff = (target_dt.year - current_dt.year) * 12 + (target_dt.month - current_dt.month)
 
             if month_diff > 0:
-                print(f"'{target_dt.year}년 {target_dt.month}월'로 이동하기 위해 '다음 달' 버튼을 {month_diff}번 클릭합니다.")
-                # ✅ [수정] for 루프 안에서 매번 '다음 달' 버튼을 새로 찾도록 변경
                 for i in range(month_diff):
                     next_month_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="calendar-button-next"]')))
-                    next_month_button.click()
+                    driver.execute_script("arguments[0].click();", next_month_button)
                     print(f"  ({i+1}/{month_diff}) '다음 달' 클릭")
-                    time.sleep(0.3)
+                    time.sleep(0.5) # 달력 애니메이션 대기
         except Exception as e:
             print(f"달력 이동 중 오류 발생: {e}")
 
-        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_in_date}"]'))).click()
+        checkin_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_in_date}"]')))
+        driver.execute_script("arguments[0].click();", checkin_button)
         time.sleep(0.5)
-        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_out_date}"]'))).click()
+        
+        checkout_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="valid-calendar-day-{check_out_date}"]')))
+        driver.execute_script("arguments[0].click();", checkout_button)
         
         print(f"인원수 선택: 성인 {num_adults}명")
         adults_input = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[data-testid="adults-amount"]')))
@@ -89,14 +89,17 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults)
         
         if current_adults != num_adults:
             button_id = "adults-amount-plus-button" if current_adults < num_adults else "adults-amount-minus-button"
-            button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="{button_id}"]')))
             for _ in range(abs(num_adults - current_adults)):
-                button.click()
-                time.sleep(0.2)
+                button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[data-testid="{button_id}"]')))
+                driver.execute_script("arguments[0].click();", button)
+                time.sleep(0.3)
         
-        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="guest-selector-apply"]'))).click()
+        apply_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="guest-selector-apply"]')))
+        driver.execute_script("arguments[0].click();", apply_button)
+        
         print("설정한 조건으로 검색 실행...")
-        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="search-button-with-loader"]'))).click()
+        search_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="search-button-with-loader"]')))
+        driver.execute_script("arguments[0].click();", search_button)
 
         # --- 2. 모든 검색 결과 페이지 순회하며 정보 추출 ---
         page_number = 1
@@ -105,7 +108,7 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults)
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'article[data-testid="item"]')))
             time.sleep(2)
 
-            first_hotel_on_page = driver.find_element(By.CSS_SELECTOR, 'article[data-testid="item"]')
+            first_hotel_on_page = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'article[data-testid="item"]')))
             
             soup = BeautifulSoup(driver.page_source, 'html.parser')
             hotel_cards = soup.select('article[data-testid="item"]')
@@ -135,11 +138,10 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults)
                 except AttributeError:
                     continue
             
-            # --- 다음 페이지로 이동 ('다음' 화살표 버튼 클릭) ---
             try:
-                next_page_button = driver.find_element(By.CSS_SELECTOR, 'button[data-testid="next-result-page"]')
+                next_page_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-testid="next-result-page"]')))
                 
-                if next_page_button.get_attribute('disabled'):
+                if 'disabled' in next_page_button.get_attribute('class'):
                     print("마지막 페이지입니다. 스크레이핑을 종료합니다.")
                     break
                     
@@ -149,7 +151,7 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults)
                 
                 wait.until(EC.staleness_of(first_hotel_on_page))
 
-            except NoSuchElementException:
+            except (NoSuchElementException, TimeoutException):
                 print("마지막 페이지입니다. 스크레이핑을 종료합니다.")
                 break
     
@@ -163,8 +165,8 @@ def crawl_trivago_final(search_query, check_in_date, check_out_date, num_adults)
 # --- 메인 코드 실행 ---
 if __name__ == "__main__":
     SEARCH_QUERY = "서울"
-    CHECK_IN = "2025-11-20"
-    CHECK_OUT = "2025-11-23"
+    CHECK_IN = "2025-08-02"
+    CHECK_OUT = "2025-08-04"
     ADULTS = 2
 
     print(f"'{SEARCH_QUERY}' 지역, {CHECK_IN} ~ {CHECK_OUT}, 성인 {ADULTS}명 조건으로 크롤링 시작...")
@@ -184,7 +186,7 @@ if __name__ == "__main__":
         print(df)
         print("="*80)
         
-        filename = f"trivago_{SEARCH_QUERY}_all_pages.csv"
+        filename = f"trivago_{SEARCH_QUERY}.csv"
         df.to_csv(filename, index=False, encoding='utf-8-sig')
         print(f"\n'{filename}' 파일로 저장이 완료되었습니다.")
     else:
