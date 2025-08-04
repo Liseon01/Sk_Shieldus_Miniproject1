@@ -11,6 +11,7 @@ st.markdown("---")
 
 st.markdown("""
 
+
 ### 🏨 숙소 비교
 - 야놀자, 여기어때, 트리바고 3개 플랫폼에서 숙소 가격과 평점을 수집하고 비교합니다.
 - 가성비 기준 정렬 기능을 제공합니다.
@@ -28,7 +29,6 @@ st.markdown("""
 2. 숙소명 또는 지역명을 입력하여 다양한 정보를 탐색해보세요.
 
 """)
-st.image("https://cdn.pixabay.com/photo/2020/03/11/21/05/room-4926143_1280.jpg", use_container_width=True)
 
 
 st.info("좌측 메뉴에서 기능을 선택하세요. 🙌")
