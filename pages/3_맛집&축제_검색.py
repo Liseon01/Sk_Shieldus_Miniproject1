@@ -3,6 +3,17 @@ import requests
 import re
 from collections import defaultdict
 
+st.set_page_config(page_title="맛집 & 검색 탐색기", layout="wide")
+
+# --- CSS 적용 코드 시작 ---
+def local_css(file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+local_css("style.css")
+# --- CSS 적용 코드 끝 ---
+
+
 # Naver API 키
 CLIENT_ID = "zJ9cQ9L23e3ORhQEBskW"
 CLIENT_SECRET = "9vPrljlqX0"
@@ -77,16 +88,15 @@ def group_festivals_by_date(items):
     return festivals_by_date
 
 # 📍 UI
-st.set_page_config(page_title="맛집 & 축제 탐색기", layout="wide")
-st.title("📍 맛집 & 축제 탐색기")
+st.title("📍 맛집 & 축제 검색기")
 
 with st.form("search_form"):
     address = st.text_input("현재 주소를 입력하세요 (예: 서울특별시 광진구 화양동)")
-    submitted = st.form_submit_button("탐색하기")
+    submitted = st.form_submit_button("검색하기")
 
 if submitted and address:
     area = get_area_from_address(address)
-    st.subheader(f"🔍 '{area}' 지역 탐색 결과")
+    st.subheader(f"🔍 '{area}' 지역 검색 결과")
 
     tabs = st.tabs(["🍽️ 맛집 추천", "🎉 2025 축제 정보"])
 

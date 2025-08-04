@@ -1,5 +1,15 @@
 import streamlit as st
-st.set_page_config(page_title="숙소 가격 비교 대시보드", layout="wide")
+st.set_page_config(page_title="숙소 가격 비교 대시보드", layout="wide", page_icon="📊")
+
+# --- CSS 적용 코드 시작 ---
+# CSS 파일을 읽어와서 적용하는 함수
+def local_css(file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# CSS 파일 적용
+local_css("style.css")
+# --- CSS 적용 코드 끝 ---
 
 import pandas as pd
 from modules.scraping_modules.yanolja import crawl_yanolja

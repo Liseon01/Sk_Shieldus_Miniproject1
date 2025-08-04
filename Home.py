@@ -1,17 +1,26 @@
 import streamlit as st
 
+# --- 이 아래부터는 페이지의 원래 내용 ---
 st.set_page_config(
     page_title="숙소 대시보드 홈",
     layout="wide",
     page_icon="🏡"
 )
 
+# CSS 파일을 읽어와서 적용하는 함수
+def local_css(file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# CSS 파일 적용
+local_css("style.css")
+
+
+
 st.title("🏡 숙소 가격 비교 & 지역 정보 통합 대시보드")
 st.markdown("---")
 
 st.markdown("""
-
-
 ### 🏨 숙소 비교
 - 야놀자, 여기어때, 트리바고 3개 플랫폼에서 숙소 가격과 평점을 수집하고 비교합니다.
 - 가성비 기준 정렬 기능을 제공합니다.
@@ -29,6 +38,5 @@ st.markdown("""
 2. 숙소명 또는 지역명을 입력하여 다양한 정보를 탐색해보세요.
 
 """)
-
 
 st.info("좌측 메뉴에서 기능을 선택하세요. 🙌")

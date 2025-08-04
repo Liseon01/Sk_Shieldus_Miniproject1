@@ -1,5 +1,17 @@
 import streamlit as st
-st.set_page_config(page_title="숙소 가격 비교 대시보드", layout="wide")
+
+# 페이지 설정은 항상 가장 먼저 와야 합니다.
+st.set_page_config(page_title="숙소 가격 비교 대시보드", layout="wide", page_icon="🏨")
+
+# --- CSS 적용 코드 시작 ---
+# CSS 파일을 읽어와서 적용하는 함수
+def local_css(file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# CSS 파일 적용
+local_css("style.css")
+# --- CSS 적용 코드 끝 ---
 
 import pandas as pd
 from modules.scraping_modules.yanolja import crawl_yanolja
@@ -9,8 +21,49 @@ from modules.rank_modules.rank_all import crawl_all_sources
 import os
 import plotly.express as px
 
-# ✅ 사이드바: 검색 조건 입력
+
 # 사이드바 입력: 검색 조건
+def run_all_crawlers(destination, checkin, checkout, adults):
+    st.info(f"입력 정보 - 지역: {destination}, 체크인: {checkin}, 체크아웃: {checkout}, 성인: {adults}명")
+
+    with st.spinner('야놀자 크롤링 중...'):
+        df_yanolja = crawl_yanolja(destination, checkin, checkout, adults, children=0, save_csv=False)
+        df_yanolja['출처'] = '야놀자'
+        if '링크' not in df_yanolja.columns:
+            df_yanolja['링크'] = None
+
+    with st.spinner('여기어때 크롤링 중...'):
+        yeogi_csv = crawl_yeogi_to_csv(destination, checkin, checkout, adults)
+        df_yeogi = pd.read_csv(yeogi_csv)
+        df_yeogi['출처'] = '여기어때'
+        os.remove(yeogi_csv)
+        if '링크' not in df_yeogi.columns:
+            df_yeogi['링크'] = None
+
+    with st.spinner('트리바고 크롤링 중...'):
+        trivago_data = crawl_trivago_final(destination, checkin, checkout, adults)
+        df_trivago = pd.DataFrame(trivago_data)
+        df_trivago['출처'] = '트리바고'
+        df_trivago['링크'] = None
+
+    all_df = pd.concat([df_yanolja, df_yeogi, df_trivago], ignore_index=True)
+    all_df = all_df[['숙소명', '숙소유형', '위치', '평점', '가격', '출처', '링크']]
+
+    def extract_price(value):
+        if isinstance(value, str):
+            digits = ''.join(filter(str.isdigit, value))
+            return int(digits) if digits else None
+        return None
+
+    all_df['가격(원)'] = all_df['가격'].apply(extract_price)
+    all_df['평점'] = pd.to_numeric(all_df['평점'], errors='coerce')
+    all_df['가성비'] = all_df.apply(
+        lambda row: (row['평점'] / row['가격(원)']) if row['가격(원)'] and row['평점'] else None,
+        axis=1
+    )
+
+    return all_df
+
 with st.sidebar:
     st.header("🔍 검색 조건")
     destination = st.text_input("여행지", value="서울")
@@ -22,7 +75,7 @@ with st.sidebar:
     if st.button("🔎 숙소 검색"):
         result_df = run_all_crawlers(destination, checkin.strftime("%Y-%m-%d"), checkout.strftime("%Y-%m-%d"), adults)
         st.session_state["result_df"] = result_df
-        st.rerun()  
+        st.rerun()
 
 # 데이터가 저장된 경우만 아래 필터 UI, 출력 표시
 if "result_df" in st.session_state and not st.session_state["result_df"].empty:
@@ -72,7 +125,7 @@ if "result_df" in st.session_state and not st.session_state["result_df"].empty:
     st.markdown(scrollable_table, unsafe_allow_html=True)
 
     # 📊 숙소유형별 평균 가격
-    st.subheader("🏨 숙소유형별 평균 가격")
+    st.subheader("🏨 숙소유형별 비율 및 평균 가격")
     type_avg = df.dropna(subset=["가격(원)"]).groupby("숙소유형")["가격(원)"].mean().reset_index()
     fig1 = px.pie(type_avg, names="숙소유형", values="가격(원)", title="숙소유형별 평균 가격", hole=0.4)
     st.plotly_chart(fig1, use_container_width=True)

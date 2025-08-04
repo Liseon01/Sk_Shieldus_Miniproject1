@@ -1,0 +1,36 @@
+/* 전체 사이드바의 배경색 */
+[data-testid="stSidebar"] {
+    background-color: #f0f2f6;
+}
+
+/* 사이드바 메뉴 링크 */
+[data-testid="stSidebarNav"] ul {
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+[data-testid="stSidebarNav"] li a {
+    color: #333333;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid #e1e5eb;
+}
+
+/* 메뉴에 마우스를 올렸을 때 */
+[data-testid="stSidebarNav"] li a:hover {
+    background-color: #e1e5eb;
+    color: #000000;
+    border-color: #c0c7d2;
+}
+
+/* 현재 선택된(활성화된) 메뉴 */
+li[class*="st-emotion-cache-"] a[aria-current="page"] {
+    background-color: #ffffff;
+    color: #000000;
+    font-weight: 600;
+    border: 1.5px solid #4a65f2;
+}
