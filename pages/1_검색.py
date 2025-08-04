@@ -93,28 +93,47 @@ for idx, platform in enumerate(platforms):
             )
 
 # ✅ 사이드바: 검색 조건 입력
+# 사이드바 입력: 검색 조건
 with st.sidebar:
     st.header("🔍 검색 조건")
     destination = st.text_input("여행지", value="서울")
     checkin = st.date_input("체크인 날짜")
     checkout = st.date_input("체크아웃 날짜")
     adults = st.number_input("성인 인원 수", min_value=1, max_value=10, value=2)
-    search_btn = st.button("🔎 검색 및 크롤링 실행")
 
-# ✅ 검색 실행
-if search_btn:
-    result_df = run_all_crawlers(destination, checkin.strftime("%Y-%m-%d"), checkout.strftime("%Y-%m-%d"), adults)
-    st.session_state["result_df"] = result_df
-    st.success(f"총 {len(result_df)}개 숙소 정보를 수집했습니다.")
+    # 검색 버튼만 존재
+    if st.button("🔎 숙소 검색"):
+        result_df = run_all_crawlers(destination, checkin.strftime("%Y-%m-%d"), checkout.strftime("%Y-%m-%d"), adults)
+        st.session_state["result_df"] = result_df
+        st.rerun()  
 
-sort_option = st.selectbox("정렬 기준을 선택하세요", ["가격(낮은순)", "평점(높은순)", "가성비(높은순)"])
-
-# ✅ 검색 결과 출력
-if "result_df" in st.session_state:
+# 데이터가 저장된 경우만 아래 필터 UI, 출력 표시
+if "result_df" in st.session_state and not st.session_state["result_df"].empty:
     df = st.session_state["result_df"].copy()
 
+    # 사이드바 가격 필터 슬라이더
+    with st.sidebar:
+        st.markdown("---")
+        st.header("💸 가격 필터")
+        valid_prices = df["가격(원)"].dropna().astype(int)
+        min_price = int(valid_prices.min())
+        max_price = int(valid_prices.max())
+        price_min, price_max = st.slider(
+            "1박당 요금 (원)",
+            min_value=min_price,
+            max_value=max_price,
+            value=(min_price, max_price),
+            step=10000
+        )
+
+    # 👉 가격 필터 적용
+    df = df.dropna(subset=["가격(원)"])
+    df = df[df["가격(원)"].between(price_min, price_max)]
+
+    # 정렬 옵션
+    sort_option = st.selectbox("정렬 기준을 선택하세요", ["가격(낮은순)", "평점(높은순)", "가성비(높은순)"])
     if sort_option == "가격(낮은순)":
-        df = df.sort_values("가격(원)", ascending=True)
+        df = df.sort_values("가격(원)")
     elif sort_option == "평점(높은순)":
         df = df.sort_values("평점", ascending=False)
     elif sort_option == "가성비(높은순)":
