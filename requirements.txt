@@ -2,6 +2,7 @@ streamlit
 selenium
 webdriver-manager
 chromedriver-autoinstaller
+google-chrome-stable
 pandas
 numpy
 matplotlib
