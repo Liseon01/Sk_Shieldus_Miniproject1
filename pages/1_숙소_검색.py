@@ -58,7 +58,7 @@ def run_all_crawlers(destination, checkin, checkout, adults):
     all_df['가격(원)'] = all_df['가격'].apply(extract_price)
     all_df['평점'] = pd.to_numeric(all_df['평점'], errors='coerce')
     all_df['가성비'] = all_df.apply(
-        lambda row: (row['평점'] / row['가격(원)']) if row['가격(원)'] and row['평점'] else None,
+        lambda row: (row['평점'] / row['가격(원)'] * 1000) if row['가격(원)'] and row['평점'] else None,
         axis=1
     )
 
